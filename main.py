@@ -17,7 +17,7 @@ def png_crc32_crack_wh(file_name):
                 width_bytes = w.to_bytes(4, 'big')
                 height_bytes = h.to_bytes(4, 'big')
                 if zlib.crc32(IHDR + width_bytes + height_bytes + str2) == crc32:
-                    return f"PNG图片宽度：{hex(w)} | {w}\nPNG图片高度：{hex(h)} | {h}"
+                    return f"PNG图片宽度：{ hex(w)} | {w}\nPNG图片高度：{hex(h)} | {h}"
             if zlib.crc32(IHDR + width_bytes + height_bytes + str2) == crc32:
                 break
     else:
