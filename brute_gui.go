@@ -74,6 +74,7 @@ func NewGUI() *GUI {
 	icon := fyne.NewStaticResource("icon", resourceIconPng.StaticContent)
 	window.SetIcon(icon) // 设置窗口图标
 	myApp.SetIcon(icon)
+	window.SetFixedSize(true) // 禁止调整窗口大小
 	actionBtn := widget.NewButton("开始爆破", nil)
 	return &GUI{
 		window:       window,

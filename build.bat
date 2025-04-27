@@ -20,8 +20,8 @@ for %%a in (%arch_list%) do (
 
     mkdir build\%%a
     go build -o build\%%a\Brute_Crack_PNG_Windows_%%a.exe .\cli\brute.go
-    go build -tags main -o Brute_Crack_PNG.exe
-    fyne package -os windows -icon icon.png
+@REM     go build -tags main -o Brute_Crack_PNG.exe
+@REM     fyne package -os windows -icon icon.png
 
     if errorlevel 1 (
         echo 编译 %%a 架构失败!
