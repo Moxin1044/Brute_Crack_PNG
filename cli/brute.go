@@ -28,7 +28,6 @@ func main() {
 			panic(err)
 		}
 		fmt.Printf("PNG图片宽度：0x%x | %d\nPNG图片高度：0x%x | %d\n", width, width, height, height)
-		// fmt.Printf("PNG图片宽度：%s | %d\nPNG图片高度：%s | %d\n", hex.EncodeToString([]byte{byte(width >> 24), byte(width >> 16), byte(width >> 8), byte(width)}), width, hex.EncodeToString([]byte{byte(height >> 24), byte(height >> 16), byte(height >> 8), byte(height)}), height)
 	} else {
 		fmt.Println("可能不是PNG文件，或文件头有修改。")
 	}

@@ -9,9 +9,12 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 	"hash/crc32"
 	"io/ioutil"
+	"net/url"
+	"path/filepath"
 )
 
 type GUI struct {
@@ -64,9 +67,13 @@ func BruteForcePNG(ctx context.Context, filePath string, checkHeight bool, progr
 
 func NewGUI() *GUI {
 	myApp := app.New()
-	window := myApp.NewWindow("PNG爆破工具 v3.0")
+	window := myApp.NewWindow("Brute_Crack_PNG V1.0 GUI — M0x1n")
 	window.Resize(fyne.NewSize(600, 400))
-
+	// 图标定义
+	//icon, _ := fyne.LoadResourceFromPath("icon.png") // 需准备 512x512 PNG 文件[2,4](@ref)
+	icon := fyne.NewStaticResource("icon", resourceIconPng.StaticContent)
+	window.SetIcon(icon) // 设置窗口图标
+	myApp.SetIcon(icon)
 	actionBtn := widget.NewButton("开始爆破", nil)
 	return &GUI{
 		window:       window,
@@ -212,9 +219,33 @@ func (g *GUI) SaveFile() {
 			return
 		}
 
-		dialog.ShowInformation("保存成功",
-			"文件已保存至："+writer.URI().Path(),
-			g.window)
+		savePath := writer.URI().Path()
+		dialog.ShowCustom("保存成功", "关闭", container.NewVBox(
+			widget.NewLabel("文件已保存至："+savePath),
+			container.NewHBox(
+				widget.NewButton("打开文件", func() {
+					parsedURL, parseErr := url.Parse(storage.NewFileURI(savePath).String())
+					if parseErr != nil {
+						dialog.ShowError(fmt.Errorf("解析URL失败: %v", parseErr), g.window)
+						return
+					}
+					if err := fyne.CurrentApp().OpenURL(parsedURL); err != nil {
+						dialog.ShowError(fmt.Errorf("无法打开文件: %v", err), g.window)
+					}
+				}),
+				widget.NewButton("打开文件夹", func() {
+					dirPath := filepath.Dir(savePath)
+					parsedURL, parseErr := url.Parse(storage.NewFileURI(dirPath).String())
+					if parseErr != nil {
+						dialog.ShowError(fmt.Errorf("解析URL失败: %v", parseErr), g.window)
+						return
+					}
+					if err := fyne.CurrentApp().OpenURL(parsedURL); err != nil {
+						dialog.ShowError(fmt.Errorf("无法打开文件夹: %v", err), g.window)
+					}
+				}),
+			),
+		), g.window)
 	}, g.window)
 
 	saveDialog.SetFileName("modified.png")
