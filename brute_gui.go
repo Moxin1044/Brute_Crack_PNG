@@ -21,11 +21,11 @@ type GUI struct {
 	heightEntry  *widget.Entry
 	heightCheck  *widget.Check
 	progress     *widget.ProgressBar
-	actionButton *widget.Button // 合并开始/停止按钮
+	actionButton *widget.Button
 	saveButton   *widget.Button
 	modifiedData []byte
-	cancelFunc   context.CancelFunc // 新增取消函数
-	isRunning    bool               // 任务运行状态标志
+	cancelFunc   context.CancelFunc
+	isRunning    bool
 }
 
 func BruteForcePNG(ctx context.Context, filePath string, checkHeight bool, progressCallback func(float64)) (bool, []byte, int, error) {
@@ -35,7 +35,7 @@ func BruteForcePNG(ctx context.Context, filePath string, checkHeight bool, progr
 	}
 
 	if hex.EncodeToString(data[:8]) != "89504e470d0a1a0a" {
-		return false, nil, 0, fmt.Errorf("invalid PNG header")
+		return false, nil, 0, fmt.Errorf("无效的PNG文件头")
 	}
 
 	for i := 0; i < 0xFFFF; i++ {
@@ -84,7 +84,7 @@ func (g *GUI) LoadUI() {
 	form := &widget.Form{
 		Items: []*widget.FormItem{
 			{Text: "目标文件", Widget: container.NewBorder(nil, nil, nil,
-				widget.NewButton("选择文件", g.selectFile), g.fileEntry)},
+				widget.NewButton("选择文件", g.SelectFile), g.fileEntry)},
 			{Text: "当前宽度", Widget: g.widthEntry},
 			{Text: "当前高度", Widget: g.heightEntry},
 		},
@@ -109,28 +109,58 @@ func (g *GUI) LoadUI() {
 	g.window.SetContent(content)
 }
 
-func (g *GUI) toggleBruteForce() {
+func (g *GUI) SelectFile() {
+	dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+		if err != nil || reader == nil {
+			return
+		}
+
+		path := reader.URI().Path()
+		g.fileEntry.SetText(path)
+
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			dialog.ShowError(err, g.window)
+			return
+		}
+
+		if len(data) < 24 {
+			dialog.ShowError(fmt.Errorf("文件太小"), g.window)
+			return
+		}
+
+		g.widthEntry.SetText(fmt.Sprintf("%d", binary.BigEndian.Uint32(data[16:20])))
+		g.heightEntry.SetText(fmt.Sprintf("%d", binary.BigEndian.Uint32(data[20:24])))
+	}, g.window).Show()
+}
+func (g *GUI) ToggleBruteForce() {
 	if !g.isRunning {
-		// 启动任务
 		ctx, cancel := context.WithCancel(context.Background())
 		g.cancelFunc = cancel
 		g.isRunning = true
 		g.actionButton.SetText("停止爆破")
 		g.saveButton.Disable()
+		g.saveButton.Refresh() // 强制立即刷新
+		var success bool
+		var size int
 
 		go func() {
 			defer func() {
 				g.isRunning = false
-				fyne.CurrentApp().Driver().CanvasForObject(g.actionButton).Refresh(g.actionButton)
+				g.actionButton.SetText("开始爆破")
+				g.progress.SetValue(0)
+				g.actionButton.Refresh()
+				g.progress.Refresh()
 			}()
 
-			success, data, size, err := BruteForcePNG(
+			var err error
+			success, g.modifiedData, size, err = BruteForcePNG(
 				ctx,
 				g.fileEntry.Text,
 				g.heightCheck.Checked,
 				func(p float64) {
-					fyne.CurrentApp().Driver().CanvasForObject(g.progress).Refresh(g.progress)
 					g.progress.SetValue(p)
+					g.progress.Refresh()
 				})
 
 			if err != nil {
@@ -139,8 +169,8 @@ func (g *GUI) toggleBruteForce() {
 			}
 
 			if success {
-				g.modifiedData = data
 				g.saveButton.Enable()
+				g.saveButton.Refresh()
 				dimType := "宽度"
 				if g.heightCheck.Checked {
 					dimType = "高度"
@@ -151,22 +181,50 @@ func (g *GUI) toggleBruteForce() {
 			}
 		}()
 	} else {
-		// 停止任务
 		if g.cancelFunc != nil {
 			g.cancelFunc()
 		}
 		g.actionButton.SetText("开始爆破")
 		g.progress.SetValue(0)
 		g.saveButton.Disable()
+		g.saveButton.Refresh()
 	}
 }
 
-// 其他方法保持不变（selectFile/saveFile等）
+func (g *GUI) SaveFile() {
+	if g.modifiedData == nil {
+		dialog.ShowError(fmt.Errorf("请先进行爆破"), g.window)
+		return
+	}
+
+	saveDialog := dialog.NewFileSave(func(writer fyne.URIWriteCloser, err error) {
+		if err != nil {
+			dialog.ShowError(err, g.window)
+			return
+		}
+		if writer == nil {
+			return
+		}
+		defer writer.Close()
+
+		if _, err := writer.Write(g.modifiedData); err != nil {
+			dialog.ShowError(fmt.Errorf("保存失败: %v", err), g.window)
+			return
+		}
+
+		dialog.ShowInformation("保存成功",
+			"文件已保存至："+writer.URI().Path(),
+			g.window)
+	}, g.window)
+
+	saveDialog.SetFileName("modified.png")
+	saveDialog.Show()
+}
 
 func main() {
 	gui := NewGUI()
 	gui.LoadUI()
-	gui.actionButton.OnTapped = gui.toggleBruteForce // 绑定新的控制方法
-	gui.saveButton.OnTapped = gui.saveFile
+	gui.actionButton.OnTapped = gui.ToggleBruteForce
+	gui.saveButton.OnTapped = gui.SaveFile
 	gui.window.ShowAndRun()
 }
